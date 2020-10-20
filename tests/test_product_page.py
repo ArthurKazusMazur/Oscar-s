@@ -1,38 +1,100 @@
 import pytest
-import time
+from faker import Faker
+from pages.locators import ProductPageLocators
+from pages.basket_page import BasketPage
+from pages.main_page import MainPage
+from pages.product_page import ProductPage
+from pages.locators import MainPageLocators
+from pages.login_page import LoginRegisterPage
 
-from pages.product_page import PromoPage
-from pages.locators import PromoPageLocators
-from pages.locators import ConfirmationPageLocators
+main_link = 'http://selenium1py.pythonanywhere.com/en-gb/'
+link = "http://selenium1py.pythonanywhere.com/en-gb/catalogue/the-shellcoders-handbook_209/"
+reg_url = "http://selenium1py.pythonanywhere.com/en-gb/accounts/login/"
+# for logging user
+login_email = 'kazus@gmail.com'
+login_password = 'qwer123456789'
+# random emails & passwords generator
+gen = Faker()
+email = gen.email()
+password = gen.name()
 
 
-@pytest.mark.parametrize('link', ["http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer0",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer1",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer2",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer3",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer4",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer5",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer6",
-                                  pytest.param("bugged_link", marks=pytest.mark.xfail),
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer8",
-                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer9"])
-def test_guest_can_add_product_to_basket(browser, link):
-    browser.delete_all_cookies()
-    page = PromoPage(browser, link)
+@pytest.mark.need_review
+def test_guest_can_add_product_to_basket(browser):
+    page = ProductPage(browser, link)
     page.open()
-
-    catalogue_product_name = browser.find_element(*PromoPageLocators.CATALOGUE_PRODUCT_NAME).text
-    catalogue_product_price = browser.find_element(*PromoPageLocators.CATALOGUE_PRICE).text
-
     page.add_to_basket()
-    page.solve_quiz_and_get_code()
+    conf_page = BasketPage(browser, browser.current_url)
+    conf_page.view_basket_after_adding_product()
 
-    basket_product_name = browser.find_element(*ConfirmationPageLocators.BASKET_PRODUCT_NAME).text
-    basket_product_price = browser.find_element(*ConfirmationPageLocators.BASKET_TOTAL_PRICE).text
 
-    assert catalogue_product_price == basket_product_price, "PRODUCT PRICE DOES NOT MATCH!!!"
-    assert catalogue_product_name == basket_product_name, "PRODUCT NAME DOES NOT MATCH!!!"
+class TestUserAddToBasketFromProductPage():
+    @pytest.mark.need_review
+    def test_user_can_add_product_to_basket(self, browser):
+        # main page and redirect to login page
+        main_page = MainPage(browser, main_link)
+        main_page.open()
+        main_page.go_to_login_register_page(reg_url)
+        # login user &  checking wether user is logged in
+        login_page = LoginRegisterPage(browser, browser.current_url)
+        login_page.user_login(login_email, login_password)
+        login_page.is_user_authorized()
+        # adding product to basket
+        page = ProductPage(browser, link)
+        page.open()
+        page.add_to_basket()
+        # checking wether product is in a basket
+        basket = BasketPage(browser, browser.current_url)
+        basket.view_basket()
 
-    print(f"Exp: {catalogue_product_name} = {catalogue_product_price}")
-    print(f"Act: {basket_product_name} = {basket_product_price}")
+    @pytest.mark.skip
+    def test_user_can_see_success_message_after_adding_product_to_basket(self, browser):
+        # main page and redirect to login page
+        main_page = MainPage(browser, main_link)
+        main_page.open()
+        main_page.go_to_login_register_page(reg_url)
+        # login user &  checking wether user is logged in
+        login_page = LoginRegisterPage(browser, browser.current_url)
+        login_page.user_login(login_email, login_password)
+        login_page.is_user_authorized()
 
+    def test_user_cant_see_success_message(self, browser):
+        page = ProductPage(browser, link)
+        page.open()
+        page.should_not_be_success_message()
+
+    @pytest.mark.need_review
+    def test_guest_cant_see_product_in_basket_opened_from_product_page(self, browser):
+        page = ProductPage(browser, link)
+        page.open()
+        page.go_to_basket_page(*ProductPageLocators.VIEW_BASKET_BTN)
+        basket = BasketPage(browser, browser.current_url)
+        basket.should_be_empty_basket()
+
+    @pytest.mark.need_review
+    def test_guest_can_go_to_login_page_from_product_page(self, browser):
+        page = ProductPage(browser, link)
+        page.open()
+        page.go_to_login_page(*MainPageLocators.LOGIN_LINK, reg_url)
+
+
+@pytest.mark.absence
+class TestMessageAbsence():
+    @pytest.mark.xfail
+    def test_guest_cant_see_success_message_after_adding_product_to_basket(self, browser):
+        page = ProductPage(browser, link)
+        page.open()
+        page.add_to_basket()
+        page.should_not_be_success_message()
+
+    def test_guest_cant_see_success_message(self, browser):
+        page = ProductPage(browser, link)
+        page.open()
+        page.should_not_be_success_message()
+
+    @pytest.mark.xfail
+    def test_message_disappeared_after_adding_product_to_basket(self, browser):
+        page = ProductPage(browser, link)
+        page.open()
+        page.add_to_basket()
+        page.should_message_disappear()
